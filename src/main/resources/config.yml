@@ -1,0 +1,43 @@
+success_rates:
+  beyond_vanilla:
+    allow_beyond_max: true
+    reduction_type: "stepped"   # "exponential", "linear", "stepped", "custom"
+    # 새로 추가된 설정:
+    severity_scale: 1.0        # 1.0 = 기존 동작, 0.5 = 감소 절반 수준(완화), 0.0 = 초과 레벨에서도 감소 없음(=baseRate 유지)
+    global_minimum_rate: 0.01  # 초과 레벨에서 적용될 절대 최소 성공률
+
+    exponential:
+      base_rate: 0.30
+      decay_factor: 0.85
+      minimum_rate: 0.01
+
+    linear:
+      base_rate: 0.30
+      reduction_per_level: 0.03
+      minimum_rate: 0.05
+
+    stepped:
+      ranges:
+        1_to_3:
+          base_rate: 0.25
+          reduction_per_level: 0.05
+        4_to_6:
+          base_rate: 0.12
+          reduction_per_level: 0.03
+        7_to_10:
+          base_rate: 0.05
+          reduction_per_level: 0.00
+        11_plus:
+          base_rate: 0.03
+          reduction_per_level: 0.00
+
+    custom_rates:
+      level_6: 0.25
+      level_7: 0.20
+      fallback_rate: 0.05
+
+    # 기존 max level limit
+    max_level_limit:
+      enabled: false       # true로 하면 (vanillaMax * max_multiplier) 까지 제한. false면 제한 해제(무제한)
+      max_multiplier: 2.0
+      absolute_max_level: 30

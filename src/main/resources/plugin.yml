@@ -1,0 +1,21 @@
+name: ToolEnhancer
+version: '1.0.6'
+main: com.krangpq.toolenhancer.ToolEnhancer
+api-version: '1.21'
+author: krangpq
+description: 도구 강화 플러그인
+
+commands:
+  enhance:
+    description: 강화 GUI를 엽니다
+    usage: /enhance
+    permission: toolenhancer.use
+    permission-message: "강화 시스템을 사용할 권한이 없습니다!"
+
+permissions:
+  toolenhancer.use:
+    description: 강화 시스템 사용 권한
+    default: true
+  toolenhancer.admin:
+    description: 관리자 권한
+    default: op
