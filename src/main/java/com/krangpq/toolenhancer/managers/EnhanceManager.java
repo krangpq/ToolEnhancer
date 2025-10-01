@@ -28,7 +28,6 @@ public class EnhanceManager {
             return false;
         }
 
-        // 강화 가능한 아이템 타입 확인
         return isEnhantableItem(item.getType());
     }
 
@@ -74,12 +73,10 @@ public class EnhanceManager {
     public Map<Enchantment, Integer> getAllPossibleEnchantments(ItemStack item) {
         Map<Enchantment, Integer> enchantments = new HashMap<>();
 
-        // 현재 적용된 인챈트
         if (item.hasItemMeta()) {
             enchantments.putAll(item.getItemMeta().getEnchants());
         }
 
-        // 적용 가능한 인챈트 (레벨 0으로 추가)
         for (Enchantment ench : getApplicableEnchantments(item)) {
             if (!enchantments.containsKey(ench)) {
                 enchantments.put(ench, 0);
@@ -96,7 +93,6 @@ public class EnhanceManager {
         ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
         EnchantmentStorageMeta meta = (EnchantmentStorageMeta) book.getItemMeta();
 
-        // 인챈트명 한글화
         String enchantName = getKoreanEnchantName(enchantment);
 
         meta.setDisplayName(ChatColor.AQUA + enchantName);
@@ -139,26 +135,22 @@ public class EnhanceManager {
         lore.add(ChatColor.WHITE + "강화 후: " + ChatColor.GOLD + getRomanNumeral(nextLevel));
         lore.add("");
 
-        // 바닐라 최대 레벨 정보 추가
         int vanillaMaxLevel = enchantment.getMaxLevel();
         if (nextLevel > vanillaMaxLevel) {
             lore.add(ChatColor.RED + "⚠ 바닐라 최대 레벨(" + vanillaMaxLevel + ")을 초과합니다!");
             lore.add("");
         }
 
-        // 최소 필요 강화석
         int minStones = stoneManager.getMinRequiredStones(nextLevel);
         lore.add(ChatColor.YELLOW + "최소 강화석: " + minStones + "개");
         lore.add(ChatColor.WHITE + "현재 강화석: " + stoneCount + "개");
         lore.add("");
 
         if (stoneCount >= minStones) {
-            // 올바른 확률 계산 방식 사용
             double baseRate = stoneManager.getBaseSuccessRate(currentLevel, vanillaMaxLevel);
             double successRate = stoneManager.calculateSuccessRate(stoneCount, baseRate);
             double destroyRate = stoneManager.calculateDestroyRate(stoneCount, nextLevel);
 
-            // 확률 검증 및 안전장치
             successRate = Math.max(0.0, Math.min(1.0, successRate));
             destroyRate = Math.max(0.0, Math.min(1.0, destroyRate));
             double failRate = Math.max(0.0, 1.0 - successRate - destroyRate);
@@ -209,51 +201,44 @@ public class EnhanceManager {
     }
 
     /**
-     * 실제 강화 진행
+     * 실제 강화 진행 (config.yml 최대 레벨 제한 적용)
      */
     public EnhanceResult performEnhance(ItemStack item, Enchantment enchantment, int stoneCount,
                                         EnhanceStoneManager stoneManager) {
         int currentLevel = item.getEnchantmentLevel(enchantment);
         int nextLevel = currentLevel + 1;
 
-        // 절대 최대 레벨 체크 (바닐라 최대 레벨의 2배까지만)
         int vanillaMaxLevel = enchantment.getMaxLevel();
-        int absoluteMaxLevel = vanillaMaxLevel * 2;
+        int absoluteMaxLevel = stoneManager.getAbsoluteMaxLevel(vanillaMaxLevel);
 
         if (nextLevel > absoluteMaxLevel) {
             return new EnhanceResult(EnhanceResult.Type.MAX_LEVEL,
                     ChatColor.RED + "더 이상 강화할 수 없습니다! 최대 레벨: " + absoluteMaxLevel, item);
         }
 
-        // 최소 강화석 체크
         int minStones = stoneManager.getMinRequiredStones(nextLevel);
         if (stoneCount < minStones) {
             return new EnhanceResult(EnhanceResult.Type.INSUFFICIENT_MATERIALS,
                     ChatColor.RED + "강화석이 부족합니다! (" + stoneCount + "/" + minStones + ")", item);
         }
 
-        // 올바른 확률 계산 방식 사용
         double baseRate = stoneManager.getBaseSuccessRate(currentLevel, vanillaMaxLevel);
         double successRate = stoneManager.calculateSuccessRate(stoneCount, baseRate);
         double destroyRate = stoneManager.calculateDestroyRate(stoneCount, nextLevel);
 
-        // 확률 검증 및 안전장치
         successRate = Math.max(0.0, Math.min(1.0, successRate));
         destroyRate = Math.max(0.0, Math.min(1.0, destroyRate));
 
-        // 디버그 정보 출력 (개발 중에만 사용)
         plugin.getLogger().info(String.format("강화 시도 - %s 레벨: %d->%d, 성공률: %.1f%%, 파괴율: %.1f%%, 강화석: %d개",
                 getKoreanEnchantName(enchantment), currentLevel, nextLevel, successRate * 100, destroyRate * 100, stoneCount));
 
         double roll = random.nextDouble();
 
         if (roll < destroyRate) {
-            // 파괴 (먼저 체크)
             return new EnhanceResult(EnhanceResult.Type.DESTROYED,
                     ChatColor.DARK_RED + "강화 실패로 아이템이 파괴되었습니다!", null);
 
         } else if (roll < destroyRate + successRate) {
-            // 성공
             ItemStack result = item.clone();
             result.addUnsafeEnchantment(enchantment, nextLevel);
             return new EnhanceResult(EnhanceResult.Type.SUCCESS,
@@ -261,7 +246,6 @@ public class EnhanceManager {
                             getRomanNumeral(nextLevel) + " 획득!", result);
 
         } else {
-            // 실패 (아이템 유지)
             return new EnhanceResult(EnhanceResult.Type.FAILED,
                     ChatColor.YELLOW + "강화에 실패했습니다. 아이템은 유지됩니다.", item);
         }
@@ -298,7 +282,7 @@ public class EnhanceManager {
      */
     private String getRomanNumeral(int number) {
         if (number <= 0) return "0";
-        if (number > 20) return String.valueOf(number); // 20 이상은 아라비아 숫자로
+        if (number > 20) return String.valueOf(number);
 
         String[] romanNumerals = {"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
                 "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"};

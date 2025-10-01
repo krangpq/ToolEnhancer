@@ -16,8 +16,29 @@ public class EnhanceStoneManager {
     private final Plugin plugin;
     public static final String ENHANCE_STONE_KEY = "ENHANCE_STONE";
 
+    // config.yml에서 로드할 설정값들
+    private final boolean allowBeyondMax;
+    private final double maxLevelMultiplier;
+    private final int absoluteMaxLevel;
+    private final double severityScale;
+    private final double globalMinimumRate;
+
     public EnhanceStoneManager(Plugin plugin) {
         this.plugin = plugin;
+
+        // config.yml에서 설정 로드
+        this.allowBeyondMax = plugin.getConfig().getBoolean("success_rates.beyond_vanilla.allow_beyond_max", true);
+        this.maxLevelMultiplier = plugin.getConfig().getDouble("success_rates.beyond_vanilla.max_level_limit.max_multiplier", 2.0);
+        this.absoluteMaxLevel = plugin.getConfig().getInt("success_rates.beyond_vanilla.max_level_limit.absolute_max_level", 30);
+        this.severityScale = plugin.getConfig().getDouble("success_rates.beyond_vanilla.severity_scale", 1.0);
+        this.globalMinimumRate = plugin.getConfig().getDouble("success_rates.beyond_vanilla.global_minimum_rate", 0.01);
+
+        plugin.getLogger().info("강화 시스템 설정 로드 완료:");
+        plugin.getLogger().info("- 바닐라 최대 레벨 초과 허용: " + allowBeyondMax);
+        plugin.getLogger().info("- 최대 레벨 배수: " + maxLevelMultiplier);
+        plugin.getLogger().info("- 절대 최대 레벨: " + absoluteMaxLevel);
+        plugin.getLogger().info("- 난이도 배율: " + severityScale);
+        plugin.getLogger().info("- 전역 최소 성공률: " + (globalMinimumRate * 100) + "%");
     }
 
     /**
@@ -39,7 +60,6 @@ public class EnhanceStoneManager {
         );
         meta.setLore(lore);
 
-        // CustomModelData로 구분 (선택사항)
         meta.setCustomModelData(12345);
 
         stone.setItemMeta(meta);
@@ -63,71 +83,55 @@ public class EnhanceStoneManager {
     }
 
     /**
-     * 강화석 개수에 따른 확률 보너스 계산 (수정된 버전)
-     * @param stoneCount 강화석 개수
-     * @param baseRate 기본 성공률
-     * @return 최종 성공률 (0.0 ~ 1.0)
+     * 강화석 개수에 따른 확률 보너스 계산
      */
     public double calculateSuccessRate(int stoneCount, double baseRate) {
         if (stoneCount <= 0) {
-            return 0.0; // 강화석이 없으면 강화 불가
+            return 0.0;
         }
 
-        // 안전한 기본 성공률 설정 (음수나 1보다 큰 값 방지)
-        double safeBateRate = Math.max(0.0, Math.min(1.0, baseRate));
+        double safeBaseRate = Math.max(0.0, Math.min(1.0, baseRate));
 
         // 강화석 1개당 5% 보너스, 최대 40% 보너스까지
         double bonus = Math.min(stoneCount * 0.05, 0.40);
 
         // 최종 성공률은 최대 95%까지
-        double finalRate = Math.min(safeBateRate + bonus, 0.95);
+        double finalRate = Math.min(safeBaseRate + bonus, 0.95);
 
-        return Math.max(0.0, finalRate); // 음수 방지
+        return Math.max(0.0, finalRate);
     }
 
     /**
-     * 강화석 개수에 따른 파괴 확률 계산 (수정된 버전)
-     * @param stoneCount 강화석 개수
-     * @param level 강화하려는 레벨 (현재 레벨 + 1)
-     * @return 파괴 확률 (0.0 ~ 1.0)
+     * 강화석 개수에 따른 파괴 확률 계산
      */
     public double calculateDestroyRate(int stoneCount, int level) {
         if (level <= 3) {
-            return 0.0; // +3 이하는 파괴되지 않음
+            return 0.0;
         }
 
-        // 기본 파괴율 계산 - 레벨이 높을수록 위험하지만 합리적인 범위로 제한
         double baseDestroyRate;
         if (level <= 5) {
-            baseDestroyRate = (level - 3) * 0.05; // +4: 5%, +5: 10%
+            baseDestroyRate = (level - 3) * 0.05;
         } else if (level <= 7) {
-            baseDestroyRate = 0.10 + (level - 5) * 0.10; // +6: 20%, +7: 30%
+            baseDestroyRate = 0.10 + (level - 5) * 0.10;
         } else if (level <= 10) {
-            baseDestroyRate = 0.30 + (level - 7) * 0.15; // +8: 45%, +9: 60%, +10: 75%
+            baseDestroyRate = 0.30 + (level - 7) * 0.15;
         } else {
-            // +11 이상은 매우 위험하지만 최대 90%까지만
             baseDestroyRate = Math.min(0.90, 0.75 + (level - 10) * 0.05);
         }
 
-        // 강화석이 많을수록 파괴율 감소 (최대 30% 감소)
         double reduction = Math.min(stoneCount * 0.02, 0.30);
-
-        // 최종 파괴율 계산 (음수가 되지 않도록)
         double finalDestroyRate = Math.max(0.0, baseDestroyRate - reduction);
 
-        // 파괴율은 최대 90%까지만
         return Math.min(finalDestroyRate, 0.90);
     }
 
     /**
-     * 레벨별 기본 성공률 계산 (새로 추가)
-     * @param currentLevel 현재 인챈트 레벨
-     * @param maxLevel 해당 인챈트의 최대 레벨
-     * @return 기본 성공률 (0.0 ~ 1.0)
+     * 레벨별 기본 성공률 계산 (config.yml 설정 반영)
      */
     public double getBaseSuccessRate(int currentLevel, int maxLevel) {
         if (currentLevel < 0) {
-            return 0.8; // 인챈트가 없는 경우 (0 -> 1)
+            return 0.8; // 인챈트가 없는 경우
         }
 
         // 바닐라 최대 레벨까지는 상대적으로 쉽게
@@ -135,37 +139,65 @@ public class EnhanceStoneManager {
             return Math.max(0.3, 0.8 - (currentLevel * 0.1));
         }
 
-        // 바닐라 최대 레벨을 넘어가는 경우 매우 어렵게
+        // 바닐라 최대 레벨을 넘어가는 경우
         int overLevel = currentLevel - maxLevel + 1;
+
+        // severityScale 적용: 0.0이면 감소 없음, 1.0이면 기존대로, 2.0이면 더 가혹하게
+        double baseReduction;
         if (overLevel <= 3) {
-            return Math.max(0.1, 0.3 - (overLevel * 0.05)); // 25%, 20%, 15%
+            baseReduction = overLevel * 0.05; // 원래: 5% 씩 감소
         } else if (overLevel <= 6) {
-            return Math.max(0.05, 0.15 - ((overLevel - 3) * 0.03)); // 12%, 9%, 6%
+            baseReduction = 0.15 + (overLevel - 3) * 0.03; // 원래: 3% 씩 감소
         } else {
-            return 0.05; // 최소 5%
+            baseReduction = 0.24; // 최대 24% 감소
+        }
+
+        // severityScale 적용
+        double scaledReduction = baseReduction * severityScale;
+        double rate = 0.3 - scaledReduction;
+
+        // globalMinimumRate 적용
+        return Math.max(globalMinimumRate, rate);
+    }
+
+    /**
+     * 최대 레벨 확인 (config.yml 설정 반영)
+     */
+    public int getAbsoluteMaxLevel(int vanillaMaxLevel) {
+        if (!allowBeyondMax) {
+            return vanillaMaxLevel;
+        }
+
+        // max_level_limit.enabled 확인
+        boolean limitEnabled = plugin.getConfig().getBoolean("success_rates.beyond_vanilla.max_level_limit.enabled", false);
+
+        if (limitEnabled) {
+            int calculatedMax = (int) (vanillaMaxLevel * maxLevelMultiplier);
+            return Math.min(calculatedMax, absoluteMaxLevel);
+        } else {
+            // 제한 해제면 absoluteMaxLevel만 적용
+            return absoluteMaxLevel;
         }
     }
 
     /**
-     * 최소 필요 강화석 개수 (수정된 버전)
-     * @param level 강화하려는 레벨 (현재 레벨 + 1)
-     * @return 최소 필요 개수
+     * 최소 필요 강화석 개수
      */
     public int getMinRequiredStones(int level) {
         if (level <= 0) {
             return 1;
         } else if (level <= 3) {
-            return 1; // +1~+3: 1개
+            return 1;
         } else if (level <= 6) {
-            return 2; // +4~+6: 2개
+            return 2;
         } else if (level <= 9) {
-            return 3; // +7~+9: 3개
+            return 3;
         } else if (level <= 12) {
-            return 5; // +10~+12: 5개
+            return 5;
         } else if (level <= 15) {
-            return 8; // +13~+15: 8개
+            return 8;
         } else {
-            return Math.min(15, 8 + (level - 15)); // +16 이상: 점진적 증가, 최대 15개
+            return Math.min(15, 8 + (level - 15));
         }
     }
 
@@ -173,7 +205,6 @@ public class EnhanceStoneManager {
      * 강화석 레시피 등록
      */
     public void registerRecipes() {
-        // 강화석 제작 레시피 (다이아몬드 + 네더의 별 조합)
         ItemStack result = createEnhanceStone(1);
         NamespacedKey key = new NamespacedKey(plugin, "enhance_stone");
 

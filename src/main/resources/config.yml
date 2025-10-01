@@ -1,21 +1,46 @@
+# ToolEnhancer 설정 파일
+
 success_rates:
   beyond_vanilla:
+    # 바닐라 최대 레벨 초과 허용 여부
     allow_beyond_max: true
+    
+    # 감소 타입 (향후 확장용 - 현재는 사용 안 함)
     reduction_type: "stepped"   # "exponential", "linear", "stepped", "custom"
-    # 새로 추가된 설정:
-    severity_scale: 1.0        # 1.0 = 기존 동작, 0.5 = 감소 절반 수준(완화), 0.0 = 초과 레벨에서도 감소 없음(=baseRate 유지)
-    global_minimum_rate: 0.01  # 초과 레벨에서 적용될 절대 최소 성공률
-
+    
+    # 난이도 배율 (바닐라 최대 레벨 초과 시 적용)
+    # 0.0 = 초과 레벨에서도 감소 없음 (쉬움)
+    # 1.0 = 기본 난이도
+    # 2.0 = 두 배로 어려움
+    severity_scale: 1.0
+    
+    # 초과 레벨에서 적용될 절대 최소 성공률
+    # 0.01 = 1%, 0.05 = 5%
+    global_minimum_rate: 0.01
+    
+    # 최대 레벨 제한 설정
+    max_level_limit:
+      # true: 레벨 제한 활성화, false: 제한 해제
+      enabled: false
+      
+      # 바닐라 최대 레벨의 몇 배까지 허용할지
+      # 예: 2.0이면 효율성 5 -> 최대 10까지 가능
+      max_multiplier: 2.0
+      
+      # 절대 최대 레벨 (어떤 인챈트도 이 레벨을 초과할 수 없음)
+      absolute_max_level: 30
+    
+    # 향후 확장용 설정들 (현재 미사용)
     exponential:
       base_rate: 0.30
       decay_factor: 0.85
       minimum_rate: 0.01
-
+    
     linear:
       base_rate: 0.30
       reduction_per_level: 0.03
       minimum_rate: 0.05
-
+    
     stepped:
       ranges:
         1_to_3:
@@ -30,14 +55,8 @@ success_rates:
         11_plus:
           base_rate: 0.03
           reduction_per_level: 0.00
-
+    
     custom_rates:
       level_6: 0.25
       level_7: 0.20
       fallback_rate: 0.05
-
-    # 기존 max level limit
-    max_level_limit:
-      enabled: false       # true로 하면 (vanillaMax * max_multiplier) 까지 제한. false면 제한 해제(무제한)
-      max_multiplier: 2.0
-      absolute_max_level: 30
