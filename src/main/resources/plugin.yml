@@ -1,5 +1,5 @@
 name: ToolEnhancer
-version: '1.0.6'
+version: '1.0.8'
 main: com.krangpq.toolenhancer.ToolEnhancer
 api-version: '1.21'
 author: krangpq
