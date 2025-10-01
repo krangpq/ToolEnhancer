@@ -249,6 +249,12 @@ mvn clean package
 
 이슈나 건의사항이 있으시면 [GitHub Issues](https://github.com/krangpq/toolenhancer/issues)에 남겨주세요.
 
+## 관련 문서
+
+- **개발 노트**: `DEVELOPMENT_NOTES.md`
+- **버그 히스토리**: `BUGFIX.md`
+- **개발 표준**: `PLUGIN_DEVELOPMENT_STANDARD.md`
+
 ---
 
 **Version**: 1.0.6  
