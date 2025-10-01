@@ -51,7 +51,9 @@ public final class ToolEnhancer extends JavaPlugin {
 
             // 5. 명령어 및 레시피 등록
             getLogger().info("[5/6] 명령어 및 레시피 등록 중...");
-            getCommand("enhance").setExecutor(new EnhanceCommand(this, enhanceGUI));
+            EnhanceCommand enhanceCommand = new EnhanceCommand(this, enhanceGUI);
+            getCommand("enhance").setExecutor(enhanceCommand);
+            getCommand("enhance").setTabCompleter(enhanceCommand);
             enhanceStoneManager.registerRecipes();
             getLogger().info("[5/6] 명령어 및 레시피 등록 완료");
 

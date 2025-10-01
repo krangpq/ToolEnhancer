@@ -19,6 +19,7 @@
 - **강화석 제작**: 다이아몬드 + 에메랄드 + 네더의 별 조합으로 제작
 - **안전 구간**: +3 이하는 파괴되지 않는 안전 구간
 - **세션 관리**: 강화 중 아이템 이동 방지 및 중복 실행 차단
+- **Public API 제공**: 다른 플러그인에서 강화 레벨 조회 및 연동 가능
 
 ## 📦 설치 방법
 
@@ -47,8 +48,15 @@ N = 네더의 별
 ```
 
 또는 관리자 명령어로 지급:
+```bash
+/enhance give <개수>           # 자신에게 지급
+/enhance give <개수> <플레이어>  # 다른 플레이어에게 지급
 ```
-/enhance give <개수>
+
+**예시**:
+```bash
+/enhance give 10              # 자신에게 10개 지급
+/enhance give 10 Steve        # Steve에게 10개 지급
 ```
 
 ### 2. 도구 강화하기
@@ -184,7 +192,8 @@ max_level_limit:
 | 명령어 | 설명 | 권한 |
 |-------|------|------|
 | `/enhance` | 강화 GUI 열기 | `toolenhancer.use` |
-| `/enhance give <개수>` | 강화석 지급 (관리자) | `toolenhancer.admin` |
+| `/enhance give <개수>` | 자신에게 강화석 지급 | `toolenhancer.admin` |
+| `/enhance give <개수> <플레이어>` | 다른 플레이어에게 강화석 지급 | `toolenhancer.admin` |
 | `/enhance help` | 도움말 보기 | `toolenhancer.use` |
 
 ### 권한
@@ -193,23 +202,161 @@ max_level_limit:
 | `toolenhancer.use` | 강화 시스템 사용 | 모든 플레이어 |
 | `toolenhancer.admin` | 관리자 명령어 사용 | OP만 |
 
+## 🔌 API 사용법 (개발자용)
+
+ToolEnhancer는 다른 플러그인에서 사용할 수 있는 Public API를 제공합니다.
+
+### 의존성 추가
+
+**plugin.yml**:
+```yaml
+depend: []
+softdepend:
+  - ToolEnhancer  # 있으면 먼저 로드, 없어도 작동
+```
+
+### API 사용 예시
+
+```java
+import com.krangpq.toolenhancer.api.ToolEnhancerAPI;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemStack;
+
+public class YourPlugin {
+    
+    public void example(ItemStack item) {
+        // API 사용 가능 여부 확인
+        if (!ToolEnhancerAPI.isEnabled()) {
+            return; // ToolEnhancer 없음
+        }
+        
+        // 강화 레벨 조회
+        int sharpnessLevel = ToolEnhancerAPI.getEnhanceLevel(
+            item, 
+            Enchantment.SHARPNESS
+        );
+        
+        // 바닐라 최대 레벨 초과 여부 확인
+        if (ToolEnhancerAPI.isBeyondVanillaMax(item, Enchantment.SHARPNESS)) {
+            // 날카로움 6 이상
+        }
+        
+        // 특정 레벨 이상인지 확인
+        if (ToolEnhancerAPI.hasEnhancementAtLeast(item, Enchantment.EFFICIENCY, 8)) {
+            // 효율성 8 이상
+        }
+    }
+}
+```
+
+### 제공되는 API 메서드
+
+| 메서드 | 설명 | 반환값 |
+|-------|------|-------|
+| `isEnabled()` | API 사용 가능 여부 | `boolean` |
+| `getVersion()` | 플러그인 버전 | `String` |
+| `getEnhanceLevel(item, ench)` | 인챈트 레벨 조회 | `int` |
+| `isBeyondVanillaMax(item, ench)` | 바닐라 최대 초과 여부 | `boolean` |
+| `hasEnhancementAtLeast(item, ench, level)` | 특정 레벨 이상 여부 | `boolean` |
+| `getTotalEnhanceLevel(item)` | 모든 인챈트 레벨 합계 | `int` |
+| `getAllEnhanceLevels(item)` | 모든 인챈트와 레벨 반환 | `Map<Enchantment, Integer>` |
+
+### 통합 예시: 상점 플러그인
+
+```java
+public class ShopPlugin {
+    
+    public double calculatePrice(ItemStack item) {
+        double basePrice = 100.0;
+        
+        // ToolEnhancer 연동
+        if (ToolEnhancerAPI.isEnabled()) {
+            int totalLevel = ToolEnhancerAPI.getTotalEnhanceLevel(item);
+            basePrice *= (1.0 + totalLevel * 0.5); // 레벨당 50% 추가
+        }
+        
+        return basePrice;
+    }
+}
+```
+
+### 커스텀 이벤트 리스닝
+
+```java
+import com.krangpq.toolenhancer.api.events.ItemEnhancedEvent;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+
+public class YourListener implements Listener {
+    
+    @EventHandler
+    public void onItemEnhanced(ItemEnhancedEvent event) {
+        Player player = event.getPlayer();
+        ItemStack item = event.getItem();
+        Enchantment ench = event.getEnchantment();
+        int level = event.getNewLevel();
+        
+        // 특정 레벨 달성 시 보상
+        if (level >= 10) {
+            player.sendMessage("10레벨 강화 달성 보상!");
+        }
+    }
+}
+```
+
+### 안전한 연동 패턴
+
+```java
+public class YourPlugin extends JavaPlugin {
+    
+    private boolean hasToolEnhancer = false;
+    
+    @Override
+    public void onEnable() {
+        // ToolEnhancer 체크
+        Plugin te = getServer().getPluginManager().getPlugin("ToolEnhancer");
+        if (te != null && te.isEnabled()) {
+            if (ToolEnhancerAPI.isEnabled()) {
+                hasToolEnhancer = true;
+                getLogger().info("ToolEnhancer 연동 활성화!");
+            }
+        }
+        
+        // ToolEnhancer 없어도 정상 작동
+        getLogger().info("플러그인 로드 완료!");
+    }
+}
+```
+
+자세한 API 문서는 소스 코드의 `api/` 패키지를 참조하세요.
+
 ## 🔧 개발 정보
 
 ### 프로젝트 구조
 ```
 src/main/java/com/krangpq/toolenhancer/
 ├── ToolEnhancer.java              # 메인 플러그인 클래스
+├── api/                           # ⭐ Public API (다른 플러그인용)
+│   ├── ToolEnhancerAPI.java       # Static API 메서드
+│   └── events/                    # 커스텀 이벤트
+│       └── ItemEnhancedEvent.java
 ├── commands/
-│   └── EnhanceCommand.java        # /enhance 명령어 처리
+│   └── EnhanceCommand.java        # /enhance 명령어 처리 + Tab 자동완성
 ├── gui/
 │   └── EnhanceGUI.java            # GUI 관리 (2단계: 선택 → 강화)
 └── managers/
     ├── EnhanceManager.java        # 강화 로직 및 확률 계산
     └── EnhanceStoneManager.java   # 강화석 관리 및 레시피
+
 ```
 
 ### 핵심 클래스 설명
 
+#### EnhanceCommand (업데이트!)
+- **handleGiveCommand()**: `/enhance give` 명령어 처리 (자신 또는 다른 플레이어에게 지급)
+- **onTabComplete()**: Tab 자동완성 지원 (서브명령어, 개수, 플레이어 목록)
+- 콘솔에서도 사용 가능 (플레이어 이름 필수)
+- 
 #### EnhanceGUI
 - **openEnhanceSelectGUI()**: 1단계 - 인챈트 선택 GUI
 - **openEnhanceProcessGUI()**: 2단계 - 강화 진행 GUI
@@ -225,6 +372,21 @@ src/main/java/com/krangpq/toolenhancer/
 - **calculateSuccessRate()**: 강화석 개수에 따른 최종 성공률 계산
 - **calculateDestroyRate()**: 레벨 및 강화석 개수에 따른 파괴율 계산
 - **getBaseSuccessRate()**: 레벨별 기본 성공률 반환
+
+#### ToolEnhancerAPI (NEW!)
+- **getEnhanceLevel()**: 아이템의 인챈트 레벨 조회
+- **isBeyondVanillaMax()**: 바닐라 최대 레벨 초과 여부 확인
+- **getTotalEnhanceLevel()**: 모든 인챈트 레벨 합계 반환
+- **isEnabled()**: API 사용 가능 여부 체크 (다른 플러그인에서 필수 호출)
+
+#### ItemEnhancedEvent (NEW!)
+- 강화 성공 시 발생하는 커스텀 이벤트
+- 다른 플러그인에서 리스닝하여 추가 기능 구현 가능
+- **getPlayer()**: 강화한 플레이어
+- **getItem()**: 강화된 아이템
+- **getEnchantment()**: 강화된 인챈트
+- **getNewLevel()**: 강화 후 레벨
+
 
 ### 빌드 방법
 ```bash
