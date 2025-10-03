@@ -3,6 +3,10 @@ package com.krangpq.toolenhancer.api;
 import com.krangpq.toolenhancer.ToolEnhancer;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * ToolEnhancer Public API
@@ -395,8 +399,6 @@ public class ToolEnhancerAPI {
     }
     /**
      * 강화석 아이템 생성
-     *
-     * @return 강화석 아이템 (1개)
      */
     public static ItemStack createEnhancementStone() {
         if (!isEnabled()) {
@@ -404,7 +406,18 @@ public class ToolEnhancerAPI {
         }
 
         try {
-            return plugin.getEnhanceStoneManager().createEnhanceStone(1);
+            ItemStack stone = plugin.getEnhanceStoneManager().createEnhanceStone(1);
+
+            // 고유 태그 추가
+            ItemMeta meta = stone.getItemMeta();
+            if (meta != null) {
+                List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
+                lore.add("§8§l[ENHANCEMENT_STONE]"); // 숨겨진 태그
+                meta.setLore(lore);
+                stone.setItemMeta(meta);
+            }
+
+            return stone;
         } catch (Exception e) {
             plugin.getLogger().warning("API createEnhancementStone() 호출 중 오류: " + e.getMessage());
             return null;
