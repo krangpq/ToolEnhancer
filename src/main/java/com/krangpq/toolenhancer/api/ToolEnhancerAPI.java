@@ -391,5 +391,23 @@ public class ToolEnhancerAPI {
             plugin.getLogger().warning("API isEnhanceStone() 호출 중 오류: " + e.getMessage());
             return false;
         }
+
+    }
+    /**
+     * 강화석 아이템 생성
+     *
+     * @return 강화석 아이템 (1개)
+     */
+    public static ItemStack createEnhancementStone() {
+        if (!isEnabled()) {
+            return null;
+        }
+
+        try {
+            return plugin.getEnhanceStoneManager().createEnhanceStone(1);
+        } catch (Exception e) {
+            plugin.getLogger().warning("API createEnhancementStone() 호출 중 오류: " + e.getMessage());
+            return null;
+        }
     }
 }
